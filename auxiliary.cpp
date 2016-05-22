@@ -60,12 +60,14 @@ void InitBoolVector(std::vector<bool>& mask, double prob, int count1, int count2
 
 
 void ParseInputFile(const string& fileName,
-	string& detectorType,
-	string& descriptorType)
+					string& detectorType,
+					string& descriptorType,
+					int& classifierType)
 {
 	ifstream in(fileName);
 	in >> detectorType;
 	in >> descriptorType;
+	in >> classifierType;
 	in.close();
 }
 
@@ -74,10 +76,11 @@ void WriteOutputFile(double **mistakes,
 					 int n,
 					 int m,
 					 std::string& detectorType,
-					 std::string& descriptorType)
+					 std::string& descriptorType,
+					 int classifierType)
 {
 	stringstream outName;
-	outName << detectorType << "_" << descriptorType << ".txt";
+	outName << detectorType << "_" << descriptorType << "_" << classifierType << ".txt";
 
 	ofstream out(outName.str());
 	for (int i = 0; i < n; i++)

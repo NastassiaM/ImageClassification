@@ -108,7 +108,7 @@ Ptr<CvDTree> TrainDTClassifier(const Mat& trainData,
 	const Mat& trainResponses)
 {
 	CvDTreeParams params;
-	params.max_depth = 10;
+	params.max_depth = 100;
 	params.min_sample_count = 1;
 	params.cv_folds = 5;
 

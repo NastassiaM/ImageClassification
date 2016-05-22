@@ -6,13 +6,17 @@
 using namespace cv;
 using namespace std;
 
+
+// detectors types: "FAST", "STAR", "SIFT", "SURF", "ORB", "MSER", "GFTT" (GoodFeaturesToTrack), "HARRIS", "Dense", "SimpleBlob"
+// descriptors types: "SIFT", "SURF", "BRIEF", "ORB"
+
 enum
 {
 	RANDOM_FOREST = 1,
 	DECISION_TREE = 2
 };
 
-void main()
+int main(int argc, char* argv[])
 {
 	/*
 	Считать аргументы, переданные программе через командную строку:
@@ -25,8 +29,6 @@ void main()
 	double trainProportion – доля объектов, используемых для построения словаря (и обучения классификатора "случайный лес").
 	*/
 
-	//string folder1 = "D:\\Projects\\OpenCV\\101_ObjectCategories\\dollar_bill";
-	//string folder2  = "D:\\Projects\\OpenCV\\101_ObjectCategories\\dollar_bill";
 	string folder1 = "D:\\Projects\\OpenCV\\Coins\\coins-5";
 	string folder2 = "D:\\Projects\\OpenCV\\Coins\\coins-10";
 
@@ -47,8 +49,9 @@ void main()
 
 	string detectorType = "SIFT";
 	string descriptorType = "SIFT";
-	//int vocSize = 50;
-	//double trainProportion = 0.5;
+	int classifierType = 0;
+
+	ParseInputFile(argv[1], detectorType, descriptorType, classifierType);
 
 	for (int i = 0; i < 5; i ++)
 	{
@@ -56,8 +59,6 @@ void main()
 		{
 			int vocSize = vocSizes[i];
 			double trainProportion = trainProportions[j];
-
-			ParseInputFile("input.txt", detectorType, descriptorType);
 
 			//Инициализировать модуль nonfree, обеспечивающий работу с SIFT и SURF детекторами и дескрипторами.
 			initModule_nonfree();
@@ -103,21 +104,50 @@ void main()
 			Mat voc = TrainVocabulary(filesList, mask, featureDetector, descExtractor, vocSize);
 
 			//Установить словарь.
-			//cv::Mat uDictionary;
-			//voc.convertTo(uDictionary, CV_8U);
-			//bowExtractor->setVocabulary(uDictionary);
-			bowExtractor->setVocabulary(voc);
+			if (descriptorType == "BRIEF" || descriptorType == "ORB")
+			{
+				cv::Mat uDictionary;
+				voc.convertTo(uDictionary, CV_8U);
+				bowExtractor->setVocabulary(uDictionary);
+			}
+			else
+			{
+				bowExtractor->setVocabulary(voc);
+			}
+			
 
 			//Сформировать тренировочную выборку для классификатора "случайный лес".
 			Mat trainData;
 			Mat trainResponses;
 			ExtractTrainData(filesList, mask, categories, featureDetector, bowExtractor, trainData, trainResponses);
 
-			//Обучить классификатор "случайный лес" на сформированной выборке.
-			Ptr<CvRTrees> classifier = TrainClassifier<CvRTrees, CvRTParams>(trainData, trainResponses);
+			Mat predictions;
+			switch (classifierType)
+			{
+				case RANDOM_FOREST:
+				{
+					//Обучить классификатор "случайный лес" на сформированной выборке.
+					Ptr<CvRTrees> classifier = TrainRFClassifier(trainData, trainResponses);
 
-			//Предсказать категории изображений, относящихся к тестовой выборке.
-			Mat predictions = PredictOnTestData<CvRTrees>(filesList, mask, featureDetector, bowExtractor, classifier);
+					//Предсказать категории изображений, относящихся к тестовой выборке.
+					predictions = PredictOnTestData<CvRTrees>(filesList, mask, featureDetector, bowExtractor, classifier);
+					break;
+				}
+				case DECISION_TREE:
+				{
+					//Обучить классификатор "дерево решений" на сформированной выборке.
+					Ptr<CvDTree> classifier = TrainDTClassifier(trainData, trainResponses);
+
+					//Предсказать категории изображений, относящихся к тестовой выборке.
+					predictions = PredictOnTestData<CvDTree>(filesList, mask, featureDetector, bowExtractor, classifier);
+					break;
+				}
+				default:
+				{
+					cout << "Incorrect classifier type. 1 or 2 required." << endl;
+					return -1;
+				}
+			}
 
 			//Сформировать матрицу, содержащую правильные категории изображений из тестовой выборки.
 			Mat rightAnswers = GetTestResponses(categories, mask);
@@ -130,5 +160,7 @@ void main()
 		}
 	}
 
-	WriteOutputFile(mistakes, 5, 3, detectorType, descriptorType);
+	WriteOutputFile(mistakes, 5, 3, detectorType, descriptorType, classifierType);
+
+	return 0;
 }
