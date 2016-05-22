@@ -39,12 +39,12 @@ int main(int argc, char* argv[])
 	int count2 = GetFilesInFolder(folder2, filesList);
 	int totalCount = count1 + count2;
 
-	double **mistakes = new double*[5];
-	for (int i = 0; i < 5; i++)
+	double **mistakes = new double*[6];
+	for (int i = 0; i < 6; i++)
 	{
 		mistakes[i] = new double[3];
 	}
-	int vocSizes[] = { 50, 60, 70, 80, 90 };
+	int vocSizes[] = { 50, 60, 70, 80, 90, 100 };
 	double trainProportions[] = { 0.5, 0.6, 0.7 };
 
 	string detectorType = "SIFT";
@@ -53,28 +53,45 @@ int main(int argc, char* argv[])
 
 	ParseInputFile(argv[1], detectorType, descriptorType, classifierType);
 
-	for (int i = 0; i < 5; i ++)
+	//Инициализировать модуль nonfree, обеспечивающий работу с SIFT и SURF детекторами и дескрипторами.
+	initModule_nonfree();
+
+	//Создать объект класса, детектирующего ключевые точки (типа detectorType).
+	Ptr<FeatureDetector> featureDetector = FeatureDetector::create(detectorType);
+
+	//Создать объект класса типа, вычисляющего дескрипторы ключевых точек (типа descriptorType).
+	Ptr<DescriptorExtractor> descExtractor = DescriptorExtractor::create(descriptorType);
+
+	//Создать объект класса, предназначенного для нахождения ближайшего к дескриптору "слова" 
+	//из словаря дескрипторов ключевых точек (типа "BruteForce").
+	Ptr<DescriptorMatcher> descriptorsMatcher = DescriptorMatcher::create("BruteForce");
+
+	//Создать объект класса, предназначенного для вычисления признакового описания изображений.
+	Ptr<BOWImgDescriptorExtractor> bowExtractor = new BOWImgDescriptorExtractor(descExtractor, descriptorsMatcher);
+
+	//Создать матрицу, содержащую категории изображений: число строк равно суммарному числу изображений, число столбцов равно 1, 
+	//элементами матрицы являются 32-битные целые числа со знаком. 
+	//Заполнить матрицу следующим образом: объектам, относящимся к первой категории, соотвествует значение 1, 
+	//объектам, относящимся ко второй категории – -1.
+	Mat categories(totalCount, 1, CV_32S);
+	for (int k = 0; k < totalCount; k++)
+	{
+		if (k < count1)
+		{
+			categories.at<int>(k, 0) = 1;
+		}
+		else
+		{
+			categories.at<int>(k, 0) = -1;
+		}
+	}
+
+	for (int i = 0; i < 6; i ++)
 	{
 		for (int j = 0; j < 3; j ++)
 		{
 			int vocSize = vocSizes[i];
 			double trainProportion = trainProportions[j];
-
-			//Инициализировать модуль nonfree, обеспечивающий работу с SIFT и SURF детекторами и дескрипторами.
-			initModule_nonfree();
-
-			//Создать объект класса, детектирующего ключевые точки (типа detectorType).
-			Ptr<FeatureDetector> featureDetector = FeatureDetector::create(detectorType);
-
-			//Создать объект класса типа, вычисляющего дескрипторы ключевых точек (типа descriptorType).
-			Ptr<DescriptorExtractor> descExtractor = DescriptorExtractor::create(descriptorType);
-
-			//Создать объект класса, предназначенного для нахождения ближайшего к дескриптору "слова" 
-			//из словаря дескрипторов ключевых точек (типа "BruteForce").
-			Ptr<DescriptorMatcher> descriptorsMatcher = DescriptorMatcher::create("BruteForce");
-
-			//Создать объект класса, предназначенного для вычисления признакового описания изображений.
-			Ptr<BOWImgDescriptorExtractor> bowExtractor = new BOWImgDescriptorExtractor(descExtractor, descriptorsMatcher);
 
 			//Создать массив для хранения маски, описывающей разбиение изображений на тренировочную и тестовую выборки. 
 			//Инициализировать его случайными значениями таким образом, чтобы доля объектов, 
@@ -82,23 +99,6 @@ int main(int argc, char* argv[])
 			std::vector<bool> mask(totalCount, false);
 			//InitRandomBoolVector(mask, trainProportion);
 			InitBoolVector(mask, trainProportion, count1, count2);
-
-			//Создать матрицу, содержащую категории изображений: число строк равно суммарному числу изображений, число столбцов равно 1, 
-			//элементами матрицы являются 32-битные целые числа со знаком. 
-			//Заполнить матрицу следующим образом: объектам, относящимся к первой категории, соотвествует значение 1, 
-			//объектам, относящимся ко второй категории – -1.
-			Mat categories(totalCount, 1, CV_32S);
-			for (int k = 0; k < totalCount; k++)
-			{
-				if (k < count1)
-				{
-					categories.at<int>(k, 0) = 1;
-				}
-				else
-				{
-					categories.at<int>(k, 0) = -1;
-				}
-			}
 
 			//Обучить словарь дескрипторов ключевых точек на изображениях, относящихся к тренировочной выборке.
 			Mat voc = TrainVocabulary(filesList, mask, featureDetector, descExtractor, vocSize);
@@ -160,7 +160,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	WriteOutputFile(mistakes, 5, 3, detectorType, descriptorType, classifierType);
+	WriteOutputFile(mistakes, 6, 3, detectorType, descriptorType, classifierType);
 
 	return 0;
 }
